@@ -34,10 +34,12 @@ on htmlpreview.github.io for direct rendering, or clone and open locally.
 | --- | --- | --- |
 | [`demo.html`](https://htmlpreview.github.io/?https://github.com/UmarUzdanov/brief/blob/main/demo.html) | Cogent Q4-05 earnings release (9 pages) | 1 picture described, **7 tables — 4 with multi-row headers, one with 6 header rows** |
 | [`demo-ir.html`](https://htmlpreview.github.io/?https://github.com/UmarUzdanov/brief/blob/main/demo-ir.html) | Cogent IR Presentation 4Q25 (25 pages) | **42/42 pictures described**, 0 decorative, 0 errors; 6 tables, 2 multi-row |
+| [`demo-gov.html`](https://htmlpreview.github.io/?https://github.com/UmarUzdanov/brief/blob/main/demo-gov.html) | Utah State Board of Education — Schools Safety Playbook (30 pages) | 22/22 pictures described, 4 tables (2 multi-row, max 5 headers); **14 links, 12 rewritten by Claude** |
 
-The "4 of 7 multi-row headers" and "42/42 described" are the pitch numbers:
-they're what a "first row is header" rule and a "Figure" placeholder fail to
-produce, on real SEC-filed PDFs.
+Three pitch numbers worth saying out loud:
+- "4 of 7 multi-row headers" — what a row-0-only rule loses on a real SEC filing
+- "42 of 42 pictures described" — vs 42 generic "Figure" placeholders today
+- "12 of 14 links rewritten" — generic anchor text turned into purpose text on a Utah State Board of Ed document
 
 ## Auth
 
