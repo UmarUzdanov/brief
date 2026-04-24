@@ -67,6 +67,12 @@ uv run brief report <pdf> --out report.html --save-json augment.json
 
 # 5. Re-render HTML from a saved JSON (no Claude calls).
 uv run brief render augment.json --out report.html
+
+# 6. Pitch-ready summary numbers from a saved JSON.
+uv run brief stats augment.json
+
+# 7. Reading-order check — per-page mismatches between doc order and visual flow.
+uv run brief order <pdf>
 ```
 
 ## Architecture
