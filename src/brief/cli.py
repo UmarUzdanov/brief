@@ -34,5 +34,21 @@ def extract_cmd(pdf: Path, as_json: bool) -> None:
         click.echo(f"  [{i}] page {tbl.page}, {tbl.rows}x{tbl.cols}, bbox {tbl.bbox}")
 
 
+@main.command(name="augment")
+@click.argument("pdf", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--out", type=click.Path(dir_okay=False, path_type=Path), help="Write JSON here.")
+def augment_cmd(pdf: Path, out: Path | None) -> None:
+    """Docling extract + Claude judgment over pictures and tables."""
+    from brief.augment import augment
+
+    result = augment(pdf)
+    payload = json.dumps(asdict(result), indent=2)
+    if out:
+        out.write_text(payload)
+        click.echo(f"wrote {out}")
+    else:
+        click.echo(payload)
+
+
 if __name__ == "__main__":
     main()
