@@ -3,14 +3,14 @@
 augment(pdf_path) returns an Augmented record with alt-text per picture and
 detected header rows per table. CLI surface lives in cli.py; this module is
 importable for tests and downstream callers.
+
+Auth: Claude calls go through `claude -p` (Pro/Max subscription) — no API key.
 """
 from __future__ import annotations
 
 import io
 from dataclasses import dataclass, field
 from pathlib import Path
-
-import anthropic
 
 from brief.judge import alt_text, header_rows
 
@@ -81,7 +81,6 @@ def _table_grid(table) -> list[list[str]]:
 def augment(
     pdf_path: str | Path,
     *,
-    client: anthropic.Anthropic | None = None,
     with_images: bool = False,
 ) -> Augmented:
     """Run Docling on PDF, then Claude over each picture and each table.
@@ -93,9 +92,6 @@ def augment(
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions
     from docling.document_converter import DocumentConverter, PdfFormatOption
-
-    if client is None:
-        client = anthropic.Anthropic()
 
     opts = PdfPipelineOptions()
     opts.generate_picture_images = True
@@ -117,7 +113,7 @@ def augment(
         if png is None:
             continue
         try:
-            text = alt_text(client, png, media_type="image/png")
+            text = alt_text(png, media_type="image/png")
         except Exception as exc:  # surface errors per-item; continue the run
             text = f"ERROR: {exc}"
         pictures.append(
@@ -137,7 +133,7 @@ def augment(
         prov = provs[0]
         grid = _table_grid(tbl)
         try:
-            hdrs = header_rows(client, grid) if grid else []
+            hdrs = header_rows(grid) if grid else []
         except Exception:
             hdrs = []
         data = getattr(tbl, "data", None)
