@@ -68,5 +68,16 @@ def report_cmd(pdf: Path, out: Path) -> None:
     click.echo(f"wrote {out}")
 
 
+@main.command(name="alt")
+@click.argument("image", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+def alt_cmd(image: Path) -> None:
+    """Alt-text for a single image (no PDF needed). Smallest possible demo."""
+    from brief.judge import alt_text
+
+    suffix = image.suffix.lower()
+    media_type = "image/jpeg" if suffix in {".jpg", ".jpeg"} else "image/png"
+    click.echo(alt_text(image.read_bytes(), media_type=media_type))
+
+
 if __name__ == "__main__":
     main()
