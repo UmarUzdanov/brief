@@ -50,5 +50,23 @@ def augment_cmd(pdf: Path, out: Path | None) -> None:
         click.echo(payload)
 
 
+@main.command(name="report")
+@click.argument("pdf", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "--out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path("report.html"),
+    show_default=True,
+)
+def report_cmd(pdf: Path, out: Path) -> None:
+    """Run augment and write a self-contained HTML report (images embedded)."""
+    from brief.augment import augment
+    from brief.report import render
+
+    result = augment(pdf, with_images=True)
+    out.write_text(render(result))
+    click.echo(f"wrote {out}")
+
+
 if __name__ == "__main__":
     main()

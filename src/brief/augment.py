@@ -20,6 +20,7 @@ class AugmentedPicture:
     page: int
     bbox: tuple[float, float, float, float]
     alt_text: str
+    image_b64: str | None = None  # PNG, base64; populated when with_images=True
 
 
 @dataclass
@@ -81,8 +82,14 @@ def augment(
     pdf_path: str | Path,
     *,
     client: anthropic.Anthropic | None = None,
+    with_images: bool = False,
 ) -> Augmented:
-    """Run Docling on PDF, then Claude over each picture and each table."""
+    """Run Docling on PDF, then Claude over each picture and each table.
+
+    with_images: include base64-encoded PNG of each picture in the result.
+    Useful for HTML reports; off by default to keep JSON compact.
+    """
+    import base64 as _b64
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions
     from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -118,6 +125,7 @@ def augment(
                 page=int(getattr(prov, "page_no", 0)),
                 bbox=_bbox(prov),
                 alt_text=text,
+                image_b64=_b64.standard_b64encode(png).decode() if with_images else None,
             )
         )
 
