@@ -87,7 +87,12 @@ def report_cmd(pdf: Path, out: Path, save_json: Path | None) -> None:
 )
 def render_cmd(augment_json: Path, out: Path) -> None:
     """Re-render an HTML report from a saved augment JSON. No Claude calls."""
-    from brief.augment import Augmented, AugmentedPicture, AugmentedTable
+    from brief.augment import (
+        Augmented,
+        AugmentedLink,
+        AugmentedPicture,
+        AugmentedTable,
+    )
     from brief.report import render
 
     data = json.loads(augment_json.read_text())
@@ -96,6 +101,7 @@ def render_cmd(augment_json: Path, out: Path) -> None:
         pages=data["pages"],
         pictures=[AugmentedPicture(**p) for p in data["pictures"]],
         tables=[AugmentedTable(**t) for t in data["tables"]],
+        links=[AugmentedLink(**lk) for lk in data.get("links", [])],
     )
     out.write_text(render(aug))
     click.echo(f"wrote {out}")

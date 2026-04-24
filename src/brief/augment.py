@@ -1,8 +1,8 @@
 """End-to-end augmentation: Docling extract + Claude judgment.
 
-augment(pdf_path) returns an Augmented record with alt-text per picture and
-detected header rows per table. CLI surface lives in cli.py; this module is
-importable for tests and downstream callers.
+augment(pdf_path) returns an Augmented record with alt-text per picture,
+detected header rows per table, and improved purpose text per hyperlink.
+CLI surface lives in cli.py; this module is importable for tests.
 
 Auth: Claude calls go through `claude -p` (Pro/Max subscription) — no API key.
 """
@@ -12,7 +12,8 @@ import io
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from brief.judge import alt_text, header_rows
+from brief import links as _links
+from brief.judge import alt_text, header_rows, link_purpose
 
 
 @dataclass
@@ -33,11 +34,20 @@ class AugmentedTable:
 
 
 @dataclass
+class AugmentedLink:
+    page: int
+    target_url: str
+    visible_text: str
+    suggested_text: str  # "KEEP" if Claude says current text is fine
+
+
+@dataclass
 class Augmented:
     pdf: str
     pages: int
     pictures: list[AugmentedPicture] = field(default_factory=list)
     tables: list[AugmentedTable] = field(default_factory=list)
+    links: list[AugmentedLink] = field(default_factory=list)
 
 
 def _bbox(prov) -> tuple[float, float, float, float]:
@@ -149,5 +159,28 @@ def augment(
             )
         )
 
+    augmented_links: list[AugmentedLink] = []
+    for link in _links.collect(doc):
+        try:
+            suggested = link_purpose(
+                link.visible_text, link.surrounding_text, link.target_url
+            )
+        except Exception as exc:
+            suggested = f"ERROR: {exc}"
+        augmented_links.append(
+            AugmentedLink(
+                page=link.page,
+                target_url=link.target_url,
+                visible_text=link.visible_text,
+                suggested_text=suggested,
+            )
+        )
+
     pages = len(getattr(doc, "pages", {}) or {})
-    return Augmented(pdf=str(pdf_path), pages=pages, pictures=pictures, tables=tables)
+    return Augmented(
+        pdf=str(pdf_path),
+        pages=pages,
+        pictures=pictures,
+        tables=tables,
+        links=augmented_links,
+    )

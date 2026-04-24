@@ -125,6 +125,27 @@ def render(augmented: Augmented) -> str:
             out.append("</div>")
         out.append("</section>")
 
+    if a.links:
+        out.append("<section><h2>Links — placeholder vs claude</h2>")
+        out.append('<div class="colhead"><div></div>'
+                   '<div>today (raw anchor text)</div>'
+                   '<div>with brief (in-context purpose)</div></div>')
+        for i, lk in enumerate(a.links, 1):
+            kept = lk.suggested_text.strip().upper() == "KEEP"
+            shown = lk.visible_text if kept else lk.suggested_text
+            tag = ('<span class="tag win">already clear</span>' if kept
+                   else '<span class="tag win">rewritten</span>')
+            out.append('<div class="row">')
+            out.append(
+                f"<div><div class='meta'>link {i} · page {lk.page}<br>"
+                f"<small>{_esc(lk.target_url[:60])}</small></div></div>"
+            )
+            out.append(f"<div><span class='tag fail'>generic</span>"
+                       f"<div class='today'>{_esc(lk.visible_text or '(empty)')}</div></div>")
+            out.append(f"<div>{tag}<div class='brief'>{_esc(shown)}</div></div>")
+            out.append("</div>")
+        out.append("</section>")
+
     out.append("</main>")
     out.append('<footer>brief · c0mpiled-10/DC · 2026-04-24 · '
                'github.com/UmarUzdanov/brief</footer>')
