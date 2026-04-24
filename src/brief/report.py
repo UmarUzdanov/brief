@@ -69,11 +69,16 @@ def render(augmented: Augmented) -> str:
         f"{described} pictures described, {decor} flagged decorative</p></header><main>"
     )
 
+    multi_header = sum(1 for t in a.tables if len(t.header_rows) > 1)
+    rewritten = sum(
+        1 for lk in a.links if lk.suggested_text.strip().upper() != "KEEP"
+    )
     out.append('<section><h2>At a glance</h2><div class="summary">')
     out.append(f'<div><div class="n">{a.pages}</div><div class="label">pages</div></div>')
-    out.append(f'<div><div class="n">{pic_n}</div><div class="label">pictures</div></div>')
-    out.append(f'<div><div class="n">{described}</div><div class="label">described by claude</div></div>')
-    out.append(f'<div><div class="n">{tbl_n}</div><div class="label">tables</div></div>')
+    out.append(f'<div><div class="n">{described}</div><div class="label">pictures described</div></div>')
+    out.append(f'<div><div class="n">{multi_header}</div>'
+               f'<div class="label">tables with multi-row headers</div></div>')
+    out.append(f'<div><div class="n">{rewritten}</div><div class="label">links rewritten</div></div>')
     out.append("</div></section>")
 
     if a.pictures:
