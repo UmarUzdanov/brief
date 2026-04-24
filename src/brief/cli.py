@@ -118,5 +118,47 @@ def alt_cmd(image: Path) -> None:
     click.echo(alt_text(image.read_bytes(), media_type=media_type))
 
 
+@main.command(name="stats")
+@click.argument("augment_json", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+def stats_cmd(augment_json: Path) -> None:
+    """Pitch-ready summary numbers from a saved augment JSON."""
+    data = json.loads(augment_json.read_text())
+    pics = data.get("pictures", [])
+    tbls = data.get("tables", [])
+    lks = data.get("links", [])
+
+    decorative = sum(1 for p in pics if p["alt_text"].strip().upper() == "DECORATIVE")
+    errors = sum(1 for p in pics if p["alt_text"].strip().upper().startswith("ERROR"))
+    described = len(pics) - decorative - errors
+
+    multi_header = sum(1 for t in tbls if len(t["header_rows"]) > 1)
+    no_header = sum(1 for t in tbls if not t["header_rows"])
+    max_headers = max((len(t["header_rows"]) for t in tbls), default=0)
+
+    rewritten = sum(1 for lk in lks if lk["suggested_text"].strip().upper() != "KEEP")
+
+    click.echo(f"PDF:    {Path(data['pdf']).name}")
+    click.echo(f"Pages:  {data['pages']}")
+    click.echo("")
+    click.echo("Pictures:")
+    click.echo(f"  total:           {len(pics)}")
+    click.echo(f"  described:       {described}")
+    click.echo(f"  decorative:      {decorative}")
+    if errors:
+        click.echo(f"  errors:          {errors}")
+    click.echo("")
+    click.echo("Tables:")
+    click.echo(f"  total:                 {len(tbls)}")
+    click.echo(f"  multi-row headers:     {multi_header}  "
+               f"(default 'row 0' rule misses these)")
+    click.echo(f"  most headers in one:   {max_headers}")
+    if no_header:
+        click.echo(f"  no header detected:    {no_header}")
+    click.echo("")
+    click.echo("Links:")
+    click.echo(f"  total:               {len(lks)}")
+    click.echo(f"  rewritten by claude: {rewritten}")
+
+
 if __name__ == "__main__":
     main()
