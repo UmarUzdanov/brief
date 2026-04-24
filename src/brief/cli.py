@@ -118,6 +118,31 @@ def alt_cmd(image: Path) -> None:
     click.echo(alt_text(image.read_bytes(), media_type=media_type))
 
 
+@main.command(name="remediate")
+@click.argument("pdf", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "--out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Output PDF (default: <stem>_brief.pdf next to input).",
+)
+@click.option(
+    "--from-json",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Reuse a saved augment JSON; skip the Claude calls.",
+)
+def remediate_cmd(pdf: Path, out: Path | None, from_json: Path | None) -> None:
+    """End-to-end: brief judgment + pdfua-ac tagging + Claude alt-text injection."""
+    from brief.remediate import pipeline
+
+    if out is None:
+        out = pdf.with_stem(pdf.stem + "_brief")
+    report = pipeline(pdf, out, from_json=from_json)
+    click.echo(f"wrote {out}")
+    click.echo(f"  figures in tagged PDF:  {report['figures_in_pdf']}")
+    click.echo(f"  pictures from brief:    {report['pictures_from_brief']}")
+    click.echo(f"  alt-text injected:      {report['alt_text_injected']}")
+
+
 @main.command(name="order")
 @click.argument("pdf", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 def order_cmd(pdf: Path) -> None:
