@@ -54,6 +54,19 @@ def alt_text(
     return msg.content[0].text.strip()
 
 
+def _parse_header_rows(text: str) -> list[int]:
+    """Parse Claude's header-row response. NONE -> []; comma-separated ints kept."""
+    text = text.strip()
+    if text.upper() == "NONE":
+        return []
+    out: list[int] = []
+    for tok in text.split(","):
+        tok = tok.strip()
+        if tok.isdigit():
+            out.append(int(tok))
+    return out
+
+
 def header_rows(client: anthropic.Anthropic, cells: list[list[str]]) -> list[int]:
     """Given a 2D table of cell text, return 0-indexed header row indices."""
     rendered = "\n".join(
@@ -75,15 +88,7 @@ def header_rows(client: anthropic.Anthropic, cells: list[list[str]]) -> list[int
             }
         ],
     )
-    text = msg.content[0].text.strip()
-    if text.upper() == "NONE":
-        return []
-    out: list[int] = []
-    for tok in text.split(","):
-        tok = tok.strip()
-        if tok.isdigit():
-            out.append(int(tok))
-    return out
+    return _parse_header_rows(msg.content[0].text)
 
 
 def link_purpose(
