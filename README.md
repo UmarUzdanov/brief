@@ -14,8 +14,8 @@ the c0mpiled-10/DC hackathon (Apr 24, 2026).
 
 ## Status
 
-End-to-end pipeline running on real PDFs (Cogent SEC filings). Three of the
-deck's five judgment dimensions wired:
+End-to-end pipeline running on real PDFs. Three of the deck's five judgment
+dimensions wired:
 
 | Dimension | Status |
 | --- | --- |
@@ -25,9 +25,19 @@ deck's five judgment dimensions wired:
 | Form-field labels | ⏳ next |
 | Reading-order check | ⏳ next |
 
-See [`demo.html`](./demo.html) — runs against the Cogent Q4-05 earnings
-release. One picture, seven tables. Six header rows detected in one table
-where a "row 0 is header" rule would have shipped one.
+## Demos
+
+Self-contained HTML reports — open in any browser, no server needed. View
+on htmlpreview.github.io for direct rendering, or clone and open locally.
+
+| File | PDF | Numbers |
+| --- | --- | --- |
+| [`demo.html`](https://htmlpreview.github.io/?https://github.com/UmarUzdanov/brief/blob/main/demo.html) | Cogent Q4-05 earnings release (9 pages) | 1 picture described, **7 tables — 4 with multi-row headers, one with 6 header rows** |
+| [`demo-ir.html`](https://htmlpreview.github.io/?https://github.com/UmarUzdanov/brief/blob/main/demo-ir.html) | Cogent IR Presentation 4Q25 (25 pages) | **42/42 pictures described**, 0 decorative, 0 errors; 6 tables, 2 multi-row |
+
+The "4 of 7 multi-row headers" and "42/42 described" are the pitch numbers:
+they're what a "first row is header" rule and a "Figure" placeholder fail to
+produce, on real SEC-filed PDFs.
 
 ## Auth
 
