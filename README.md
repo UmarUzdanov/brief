@@ -14,7 +14,7 @@ the c0mpiled-10/DC hackathon (Apr 24, 2026).
 
 ## Status
 
-End-to-end pipeline running on real PDFs. Three of the deck's five judgment
+End-to-end pipeline running on real PDFs. Four of the deck's five judgment
 dimensions wired:
 
 | Dimension | Status |
@@ -22,8 +22,8 @@ dimensions wired:
 | Figure alt-text | ✅ live (claude vision) |
 | Table header detection | ✅ live (multi-row support) |
 | Link purpose text | ✅ live |
+| Reading-order check | ✅ live (`brief order <pdf>`, standalone) |
 | Form-field labels | ⏳ next |
-| Reading-order check | ⏳ next |
 
 ## Demos
 

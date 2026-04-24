@@ -118,6 +118,22 @@ def alt_cmd(image: Path) -> None:
     click.echo(alt_text(image.read_bytes(), media_type=media_type))
 
 
+@main.command(name="order")
+@click.argument("pdf", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+def order_cmd(pdf: Path) -> None:
+    """Reading-order check: per-page mismatches between doc order and visual flow."""
+    from brief.order import check
+
+    issues = check(pdf)
+    if not issues:
+        click.echo("no reading-order mismatches detected")
+        return
+    for issue in issues:
+        click.echo(f"page {issue.page}:")
+        click.echo(f"  docling:   {issue.docling_order}")
+        click.echo(f"  suggested: {issue.suggested_order}")
+
+
 @main.command(name="stats")
 @click.argument("augment_json", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 def stats_cmd(augment_json: Path) -> None:
