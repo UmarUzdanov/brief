@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.pyc
 .venv/
@@ -8,5 +9,15 @@ build/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# OS / editor
 .DS_Store
+.idea/
 *.swp
+
+# Demo corpus — sourced from the Cogent IR site, not git history
+cogent-binaries/
+src/brief/cogent-binaries/
+
+# pdfua-ac output — regenerable by build-demo.sh
+src/brief/cogent-binaries_remediated/
