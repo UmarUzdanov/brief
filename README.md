@@ -1,127 +1,148 @@
-# brief
+# pdfua-ac — how the remediation works
 
-A judgment layer for PDF accessibility.
+A six-stage pipeline that turns an unstructured PDF into a PDF/UA-1 compliant
+tagged PDF that passes veraPDF. Each stage is byte-level work on the PDF object
+graph; nothing is regenerated from scratch. The pipeline preserves visual
+fidelity while building the accessibility tree the original PDF lacks.
 
-Docling extracts structure — pictures with bounding boxes, tables with cells,
-hyperlinks with surrounding context. Claude reads what Docling found and
-produces metadata that screen readers can actually use: figure descriptions,
-content-aware table header detection, in-context link purpose text.
+Source lives at `/Users/umar/PycharmProjects/PythonProject/` — top-level
+`remediate.py`, `structure.py`, `fonts*.py`, `tika.py`.
 
-The PDF/UA spec has 136 failure conditions. About 89 are machine-checkable
-(structure, fonts, metadata) — those are solved by existing tooling. The
-remaining 47 need human judgment. brief is a swing at that 47, executed at
-the c0mpiled-10/DC hackathon (Apr 24, 2026).
+## Stage 1 — Tika structure extraction (`tika.py`)
 
-## Status
+HTTP client to a local Apache Tika server (`localhost:9998` by default; override
+via `TIKA_URL`).
 
-End-to-end pipeline running on real PDFs. Four of the deck's five judgment
-dimensions wired:
+- `extract_structure(pdf)` → Tika-marked XHTML with class hints
+  (`<p class="page">…</p>`, `<table>`, `<h1>` …)
+- `extract_metadata(pdf)` → JSON with embedded font names + document language
+- **B48 fix**: retry + exponential backoff handles Tika's intermittent OOM on
+  large PDFs
 
-| Dimension | Status |
-| --- | --- |
-| Figure alt-text | ✅ live (claude vision) |
-| Table header detection | ✅ live (multi-row support) |
-| Link purpose text | ✅ live |
-| Reading-order check | ✅ live (`brief order <pdf>`, standalone) |
-| Form-field labels | ⏳ next |
+Tika is the *semantic oracle* for the pipeline — it answers "what role does
+this content play?" Downstream stages take that answer and write it into the
+PDF's structure tree.
 
-## Demos
+## Stage 2 — Font pipeline (`fonts.py` + 5 siblings)
 
-Self-contained HTML reports — open in any browser, no server needed. View
-on htmlpreview.github.io for direct rendering, or clone and open locally.
+The largest part of the codebase. PDFs ship with fonts in many half-broken
+states; veraPDF fails on each in a different way. This stage normalizes them.
 
-| File | PDF | Numbers |
-| --- | --- | --- |
-| [`demo.html`](https://htmlpreview.github.io/?https://github.com/UmarUzdanov/brief/blob/main/demo.html) | Cogent Q4-05 earnings release (9 pages) | 1 picture described, **7 tables — 4 with multi-row headers, one with 6 header rows** |
-| [`demo-ir.html`](https://htmlpreview.github.io/?https://github.com/UmarUzdanov/brief/blob/main/demo-ir.html) | Cogent IR Presentation 4Q25 (25 pages) | **42/42 pictures described**, 0 decorative, 0 errors; 6 tables, 2 multi-row |
-| [`demo-gov.html`](https://htmlpreview.github.io/?https://github.com/UmarUzdanov/brief/blob/main/demo-gov.html) | Utah State Board of Education — Schools Safety Playbook (30 pages) | 22/22 pictures described, 4 tables (2 multi-row, max 5 headers); **14 links, 12 rewritten by Claude** |
+**Public entry points** (`fonts.py`):
+- `embed_fonts()` — embed system fonts referenced but not subset
+- `fix_cidtogidmap()` — repair broken CID-to-GID mappings on CID fonts
+- `fix_cidset()` — rebuild missing/wrong CIDSets for subsetted fonts
+- `fix_preexisting_fonts()` — apply per-font fixes inferred from font tables
+- `fix_tounicode()` / `augment_tounicode_coverage()` — repair / extend
+  `/ToUnicode` CMaps so screen readers can read the text
+- `fix_notdef_glyphs()` / `strip_notdef_operators()` — handle invalid `.notdef`
+  glyph references
+- `verify_fonts()` — pre-output validation gate
+- `fix_widget_tu()` — write `/TU` (UI tooltip) on form widget annotations
 
-Three pitch numbers worth saying out loud:
-- "4 of 7 multi-row headers" — what a row-0-only rule loses on a real SEC filing
-- "42 of 42 pictures described" — vs 42 generic "Figure" placeholders today
-- "12 of 14 links rewritten" — generic anchor text turned into purpose text on a Utah State Board of Ed document
+**Format coverage**: `.ttf` → `/FontFile2`, `.otf` → `/FontFile3`,
+`.ttc` → face extraction.
 
-## Auth
+**Symbol fonts** (`Wingdings`, `ZapfDingbats`, `Symbol`) get *synthesized*
+`/ToUnicode` CMaps from a hardcoded table — these fonts have no inherent text
+mapping, so the map is invented from glyph-name conventions.
 
-Calls go through `claude -p` (Claude Code Pro/Max subscription) — no API key
-needed. The `claude` CLI must be on PATH and logged in.
+**Sibling modules**:
+- `fonts_util.py` — small shared helpers
+- `fonts_tables.py` — static lookup tables: standard 14 PDF font metrics,
+  glyph-name → Unicode tables, symbol-font conventions
+- `fonts_discovery.py` — locate system fonts by name (macOS/Linux paths)
+- `fonts_cmap.py` — CMap parsing + emission
+- `fonts_program.py` — TrueType / CFF byte-level manipulation via `fontTools`
+  (subsetting, table rewriting, `/Widths` recalc per **B62-B63**)
 
-## Install
+## Stage 3 — Structure builder (`structure.py`)
 
-```sh
-uv sync
-```
+Walks Tika's XHTML, builds an in-memory `StructNode` tree, then writes it into
+the PDF as the `/StructTreeRoot`.
 
-## Commands
+**Tag mapping**: `TIKA_CLASS_MAP` and `TAG_MAP` translate Tika's HTML-ish
+classes (`p`, `h1`, `td`, `li`) into PDF/UA standard structure types
+(`/P`, `/H1`, `/TD`, `/LI`).
 
-```sh
-# 1. Just the Docling pass — see what was extracted, no Claude calls.
-uv run brief extract <pdf>
+**Per-page MCID allocation (B4)**: Marked Content IDs are page-local. Each page
+restarts at MCID 0; the `/ParentTree` indexes by `(page, mcid)`.
 
-# 2. Single-image alt-text — smallest possible demo surface.
-uv run brief alt <image.png>
+**Heading clamping (B5 / B23)**: forces the first heading to `/H1` and clamps
+level jumps to `previous + 1` (PDF/UA forbids skipping levels).
 
-# 3. Full augment — Claude over each picture, table, and link. JSON out.
-uv run brief augment <pdf> --out augment.json --with-images
+**Table structure**: `Table > THead > TR > TH` and `Table > TBody > TR > TD`,
+synthesizing missing wrappers. `TH` cells get `/Scope = /Column` by default.
 
-# 4. Augment + render to a self-contained HTML report.
-uv run brief report <pdf> --out report.html --save-json augment.json
+**List structure (B8)**: `L > LI > Lbl + LBody`. `Lbl` nodes deliberately get
+**no** MCID — labels are part of the marker, not the content stream.
 
-# 5. Re-render HTML from a saved JSON (no Claude calls).
-uv run brief render augment.json --out report.html
+**Content stream rewriting** (`rewrite_content_streams()`): walks every page's
+content stream, wraps every drawing operator in either:
+- `/<StructType> << /MCID n >> BDC … EMC` — tagged content
+- `/Artifact BMC … EMC` — decorative / non-content
 
-# 6. Pitch-ready summary numbers from a saved JSON.
-uv run brief stats augment.json
+**MCID reconciliation** (`compute_reconciliation()`): if the count of allocated
+MCIDs doesn't match the count of `BT` (begin-text) blocks on a page, picks one
+of three plans:
+- `AlignedPlan` — clean 1:1 map, normal case
+- `MaskPlan` — partial alignment, mask the gaps as `/Artifact`
+- `FallbackPlan` — **B34**: bail to wrapping the entire page's content as
+  `/Artifact` so the PDF still validates structurally even if granular tagging
+  is lost
 
-# 7. Reading-order check — per-page mismatches between doc order and visual flow.
-uv run brief order <pdf>
-```
+**Form XObject MCIDs (B6)**: stripped, because Form XObject `BT` counts don't
+align with the parent page's count.
 
-## Architecture
+**Orphan table cells (B64)**: bare `TH` / `TD` / `TR` without a `Table`
+ancestor get wrapped in synthetic `Table` / `TR` nodes.
 
-```
-PDF
- │
- ▼
-Docling (DocumentConverter)               extracts structure + image bboxes
- │
- ▼
-brief.augment.augment()                   orchestration
- │   ├── for each PictureItem:
- │   │     crop image → claude -p (vision) → alt_text
- │   ├── for each TableItem:
- │   │     build cell grid → claude -p → header rows (multi-row aware)
- │   └── for each hyperlink:
- │         text + context + URL → claude -p → suggested purpose text
- │
- ▼
-brief.report.render()                     side-by-side HTML
- │                                        (placeholder vs claude, embedded PNGs)
- ▼
-report.html
-```
+## Stage 4 — Catalog, XMP, annotations (`remediate.py`)
 
-## Layout
+The orchestrator. Calls the previous stages in order and writes catalog-level
+metadata.
 
-```
-src/brief/
-  extract.py    Docling-only pass; for sniffing what's in a PDF
-  judge.py      three single-purpose `claude -p` callers (alt/headers/links)
-  links.py      hyperlink collection from a Docling document
-  augment.py    orchestration: extract + judge per item
-  report.py     HTML renderer (navy/ice palette, side-by-side layout)
-  cli.py        click commands
-tests/          17 unit tests for parsers and helpers (no Claude required)
-```
+- `fix_catalog()` — sets `/MarkInfo << /Marked true >>`,
+  `/ViewerPreferences << /DisplayDocTitle true >>`, `/Lang` from Tika's detected
+  language
+- `fix_xmp()` — writes complete XMP packet: `dc:title`, `pdfuaid:part = 1`,
+  producer, current `xmp:ModifyDate`, conformance level
+- `fix_annotations()` — wires every annotation into the structure tree:
+  - `/Link` annotations get `/StructParent` and a structure-element parent
+  - Form widgets (`/Subtype /Widget`) get `/TU` from form-field tooltips
+  - **B2 fix**: `/Subtype /TrapNet` annotations are deleted (PDF/UA forbids them)
+  - **B3 fix**: `/ParentTree` is rebuilt to include every annotation
+- `guard_checks()` — final sanity pass: ensures OC `/Name`, file-spec `/F`+`/UF`
+  parity, removes XFA, deletes `/Ref` entries that PDF/UA forbids
+- `strip_existing_tags()` — first step of every run: wipes any pre-existing
+  `/StructTreeRoot`, `/StructParents`, and `BMC` / `BDC` / `EMC` markers from
+  the input. Pdfua-ac always builds the tree from scratch — never tries to
+  patch a partial existing tree.
 
-## Tests
+## Stage 5 — Output
 
-```sh
-uv run pytest -q
-```
+`pikepdf.save()` with `linearize=False`, deterministic object IDs. Output PDF
+contains:
+- Full `/StructTreeRoot`
+- `/MarkInfo`, `/ViewerPreferences`, `/Lang` on the catalog
+- Complete XMP with `pdfuaid:part = 1`
+- Embedded fonts with valid `/ToUnicode` for every glyph
+- Every visible content operator either tagged or marked `/Artifact`
 
-17 passing. None of them call Claude or load Docling models.
+## Stage 6 — Verification (`demo/verapdf_runner.py`)
 
-## License
+Subprocess wrapper around the `verapdf` CLI. Returns a `ScanResult` with
+passed/failed rules and per-rule check counts. Used both for pre-flight scans
+(diagnose what to fix) and post-flight scans (confirm the fixes worked).
 
-Built tonight. License TBD.
+## The B-comment scheme
+
+Every fix in the codebase is tagged with a `B##` identifier (B1–B66+). Each one
+references a real veraPDF failure observed on a real DC Courts PDF. The tag in
+the code points to:
+- The specific PDF that triggered the failure
+- The veraPDF rule that flagged it
+- The fix applied
+
+Reading any `B##` comment tells you what the surrounding code is defending
+against and why deleting that code would re-break a real document.
